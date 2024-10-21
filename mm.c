@@ -18,6 +18,9 @@
 #include "mm.h"
 #include "memlib.h"
 
+/* choose NOFIT / FIRSTFIT / NEXTFIT / BESTFIT */
+#define NEXTFIT
+
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your team information in the following struct.
@@ -133,36 +136,41 @@ static void *extend_heap(size_t words)
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-// void *mm_malloc(size_t size)
-// {
-//     int newsize = ALIGN(size + SIZE_T_SIZE);
-//     void *p = mem_sbrk(newsize);
-//     if (p == (void *)-1)
-// 	return NULL;
-//     else {
-//         *(size_t *)p = size;
-//         return (void *)((char *)p + SIZE_T_SIZE);
-//     }
-// }
+
+#ifdef NOFIT
+void *mm_malloc(size_t size)
+{
+    int newsize = ALIGN(size + SIZE_T_SIZE);
+    void *p = mem_sbrk(newsize);
+    if (p == (void *)-1)
+	return NULL;
+    else {
+        *(size_t *)p = size;
+        return (void *)((char *)p + SIZE_T_SIZE);
+    }
+}
+#endif
 
 /* Find a fit for a block with asize bytes */
 
+#ifdef FIRSTFIT
 /* First-fit search */
-// static void *find_fit(size_t asize)
-// { 
-//     void *bp;
-//     for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-//         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
-//             return bp;
-//         }
-//     }
-//     return NULL; // No fit
-// }
+static void *find_fit(size_t asize)
+{ 
+    void *bp;
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            return bp;
+        }
+    }
+    return NULL; // No fit
+}
+#endif
 
+#ifdef NEXTFIT
 /* Next-fit search */
 static void *find_fit(size_t asize)
 {
-    /* Next-fit search */
     void *bp;
 
     if (last_bp == NULL)
@@ -175,15 +183,29 @@ static void *find_fit(size_t asize)
         }
     }
 
-    // for (bp = heap_listp; bp < last_bp; bp = NEXT_BLKP(bp)) {
-    //     if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
-    //         last_bp = bp;
-    //         return bp;
-    //     }
-    // }
-
     return NULL; // No fit
 }
+#endif
+
+#ifdef BESTFIT
+/* Best-fit search */
+static void *find_fit(size_t asize)
+{
+    void *bp;
+    void *best_bp = NULL;
+    size_t min_size = ~0;
+
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            if (GET_SIZE(HDRP(bp)) < min_size) {
+                min_size = GET_SIZE(HDRP(bp));
+                best_bp = bp;
+            }
+        }
+    }
+    return best_bp;
+}
+#endif
 
 /* Place block of asize bytes at start of free block bp 
  * and split if remainder would be at least minimum block size */
@@ -282,6 +304,7 @@ void mm_free(void *ptr)
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
+
 // void *mm_realloc(void *ptr, size_t size)
 // {
 //     void *oldptr = ptr;
