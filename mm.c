@@ -69,7 +69,7 @@ static char *heap_listp;
 
 /* Raed the size and allocated fields from address p */
 #define GET_SIZE(p) (GET(p) & ~0x7)
-#define GET_ALLOC(p) (GET(p) && 0x1)
+#define GET_ALLOC(p) (GET(p) & 0x1)
 
 /* Given block ptr bp, compute address of its header and footer */
 #define HDRP(bp) ((char*)(bp) - WSIZE)
@@ -198,7 +198,7 @@ void *mm_malloc(size_t size)
     extendsize = MAX(asize, CHUNKSIZE);
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;
-    place(bp,size);
+    place(bp,asize);
     return bp;
 }
 
@@ -219,9 +219,10 @@ static void *coalesce(void *bp)
     }
 
     else if (!prev_alloc && next_alloc){    /* Case 3 */
-        size += GET_SIZE(HDRP((NEXT_BLKP(bp))));
-        PUT(HDRP(bp), PACK(size,0));
+        size += GET_SIZE(HDRP((PREV_BLKP(bp))));
         PUT(FTRP(bp), PACK(size,0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size,0));
+        bp = PREV_BLKP(bp);
     }
 
     else{                                   /* Case 4 */
@@ -248,18 +249,35 @@ void mm_free(void *ptr)
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size)
-{
+// void *mm_realloc(void *ptr, size_t size)
+// {
+//     void *oldptr = ptr;
+//     void *newptr;
+//     size_t copySize;
+    
+//     newptr = mm_malloc(size);
+//     if (newptr == NULL)
+//       return NULL;
+//     copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+//     if (size < copySize)
+//       copySize = size;
+//     memcpy(newptr, oldptr, copySize);
+//     mm_free(oldptr);
+//     return newptr;
+// }
+
+void *mm_realloc(void *ptr, size_t size) {
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;
     
     newptr = mm_malloc(size);
     if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+        return NULL;
+    
+    copySize = GET_SIZE(HDRP(oldptr)) - DSIZE; 
     if (size < copySize)
-      copySize = size;
+        copySize = size;
     memcpy(newptr, oldptr, copySize);
     mm_free(oldptr);
     return newptr;
