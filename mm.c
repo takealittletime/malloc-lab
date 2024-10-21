@@ -43,6 +43,9 @@ static void place(void *bp, size_t asize);
 /* static variable heap_listp */
 static char *heap_listp;
 
+/* last locartion of bp */
+static void* last_bp;
+
 /* double word (8) alignment */
 #define ALIGNMENT 8
 
@@ -99,6 +102,8 @@ int mm_init(void)
     PUT(heap_listp + (3*WSIZE), PACK(0,1));
     heap_listp += (2*WSIZE);
 
+    last_bp = heap_listp;
+
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
         return -1;
 
@@ -141,15 +146,42 @@ static void *extend_heap(size_t words)
 // }
 
 /* Find a fit for a block with asize bytes */
+
+/* First-fit search */
+// static void *find_fit(size_t asize)
+// { 
+//     void *bp;
+//     for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+//         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+//             return bp;
+//         }
+//     }
+//     return NULL; // No fit
+// }
+
+/* Next-fit search */
 static void *find_fit(size_t asize)
 {
-    /* First-fit search */
+    /* Next-fit search */
     void *bp;
-    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+
+    if (last_bp == NULL)
+        last_bp = heap_listp;
+
+    for (bp = last_bp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            last_bp = bp;
             return bp;
         }
     }
+
+    // for (bp = heap_listp; bp < last_bp; bp = NEXT_BLKP(bp)) {
+    //     if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+    //         last_bp = bp;
+    //         return bp;
+    //     }
+    // }
+
     return NULL; // No fit
 }
 
@@ -232,6 +264,7 @@ static void *coalesce(void *bp)
         bp = PREV_BLKP(bp);
     }
 
+    last_bp = bp;
     return bp;
 }
 
