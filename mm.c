@@ -18,9 +18,6 @@
 #include "mm.h"
 #include "memlib.h"
 
-/* choose NOFIT / FIRSTFIT / NEXTFIT / BESTFIT */
-#define NEXTFIT
-
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your team information in the following struct.
@@ -43,12 +40,15 @@ static void *coalesce(void *bp);
 static void *find_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
-/* static variable heap_listp */
+/* static variable pointer of heap */
 static char *heap_listp;
 
-/* last locartion of bp */
+/* last location of bp */
 static void* last_bp;
 
+//*********************************************************
+ /* Basic constants and macros */
+ 
 /* double word (8) alignment */
 #define ALIGNMENT 8
 
@@ -58,8 +58,6 @@ static void* last_bp;
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-//*********************************************************
- /* Basic constants and macros */
 #define WSIZE 4 // word size = 4bytes
 #define DSIZE 8 // double word size = 8bytes
 #define CHUNKSIZE (1<<12) //Extend heap by this amount
@@ -86,72 +84,10 @@ static void* last_bp;
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char*)(bp)-DSIZE)))
  //*********************************************************
 
-/* 
- * mm_init - initialize the malloc package.
- */
-
-int mm_init(void)
-{
-    // void * heap_listp = NULL;
-    /* Create the initial empty heap */
-    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
-        return -1;
-
-    /* prologue block */
-    PUT(heap_listp, 0);
-    PUT(heap_listp + (1*WSIZE), PACK(DSIZE,1));
-    PUT(heap_listp + (2*WSIZE), PACK(DSIZE,1));
-    /* eplilogue block */
-    PUT(heap_listp + (3*WSIZE), PACK(0,1));
-    heap_listp += (2*WSIZE);
-
-    last_bp = heap_listp;
-
-    if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
-        return -1;
-
-    return 0;
-}
-
-static void *extend_heap(size_t words)
-{
-    char * bp;
-    size_t size;
-
-    /* Allocate an even number of words to maintain alignment */
-    size = (words % 2) ? (words+1)*WSIZE: words*WSIZE;
-    if ((long)(bp = mem_sbrk(size)) == -1)
-        return NULL;
-    
-    /* Initialize free block header/footer */
-    PUT(HDRP(bp), PACK(size,0));
-    PUT(FTRP(bp), PACK(size,0));
-    /* Set epilogue block */
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0,1));
-
-    return coalesce(bp);
-}
-
-/* 
- * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
- */
-
-#ifdef NOFIT
-void *mm_malloc(size_t size)
-{
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
-	return NULL;
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
-    }
-}
-#endif
-
-/* Find a fit for a block with asize bytes */
+//*********************************************************
+/* choose type of find_fit. (FIRSTFIT / NEXTFIT / BESTFIT) */
+#define NEXTFIT
+ //********************************************************
 
 #ifdef FIRSTFIT
 /* First-fit search */
@@ -206,6 +142,59 @@ static void *find_fit(size_t asize)
     return best_bp;
 }
 #endif
+
+/* 
+ * mm_init - initialize the malloc package.
+ */
+
+int mm_init(void)
+{
+    // void * heap_listp = NULL;
+    /* Create the initial empty heap */
+    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
+        return -1;
+
+    /* prologue block */
+    PUT(heap_listp, 0);
+    PUT(heap_listp + (1*WSIZE), PACK(DSIZE,1));
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE,1));
+    /* eplilogue block */
+    PUT(heap_listp + (3*WSIZE), PACK(0,1));
+    heap_listp += (2*WSIZE);
+
+    last_bp = heap_listp;
+
+    if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
+        return -1;
+
+    return 0;
+}
+
+static void *extend_heap(size_t words)
+{
+    char * bp;
+    size_t size;
+
+    /* Allocate an even number of words to maintain alignment */
+    size = (words % 2) ? (words+1)*WSIZE: words*WSIZE;
+    if ((long)(bp = mem_sbrk(size)) == -1)
+        return NULL;
+    
+    /* Initialize free block header/footer */
+    PUT(HDRP(bp), PACK(size,0));
+    PUT(FTRP(bp), PACK(size,0));
+    /* Set epilogue block */
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0,1));
+
+    return coalesce(bp);
+}
+
+/* 
+ * mm_malloc - Allocate a block by incrementing the brk pointer.
+ *     Always allocate a block whose size is a multiple of the alignment.
+ */
+
+/* Find a fit for a block with asize bytes */
 
 /* Place block of asize bytes at start of free block bp 
  * and split if remainder would be at least minimum block size */
